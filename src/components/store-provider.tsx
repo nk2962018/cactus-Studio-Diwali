@@ -56,7 +56,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLines(current => current.flatMap(line => {
       if (line.key !== key) return [line];
       const product = getProduct(line.productId);
-      if (!product || !validOrderQuantity(product, quantity)) return [line];
+      const minimum = line.bulkOnly ? line.minimumQuantity : line.pricingType === "collection" ? line.collectionSize === 50 ? 50 : line.collectionSize === 24 ? 24 : 6 : 1;
+      if (!product || quantity < minimum || !validOrderQuantity(product, quantity)) return [line];
       try { return [makeLine(product, line.variants, quantity, line.customization)]; }
       catch { return [line]; }
     }).reduce(addLine, []));

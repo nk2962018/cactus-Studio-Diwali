@@ -42,7 +42,7 @@ export function ProductDetail({ product, full = false, number = 1, potSize }: { 
   const [customization, setCustomization] = useState("");
   const [added, setAdded] = useState(false);
   const { add, notify } = useStore();
-  const validQuantity = validOrderQuantity(product, quantity);
+  const validQuantity = validOrderQuantity(product, quantity) && (product.pricingType !== "collection" || collectionOption !== "bulk" || quantity >= 50);
   function addToCart() {
     try { add(product, selection, quantity, customization); setAdded(true); setTimeout(() => setAdded(false), 2000); }
     catch (error) { notify(error instanceof Error ? error.message : "Unable to add this product."); }
@@ -58,7 +58,7 @@ export function ProductDetail({ product, full = false, number = 1, potSize }: { 
       <div className="product-variants">{product.variants.map(variant => <VariantSelector key={variant.id} variant={{ ...variant, id: `${product.id}-${variant.id}` }} value={selection[variant.id]} onChange={value => setSelection(current => ({ ...current, [variant.id]: value }))} />)}{product.pricingType === "collection" && <CollectionQuantityPicker productId={product.id} value={collectionOption} quantity={quantity} onSelect={setCollectionOption} onQuantityChange={setQuantity} />}</div>
       {product.customizable && <label className="custom-note">Make it personal <span>(optional)</span><textarea rows={2} maxLength={300} placeholder="A gift note or a little customization..." value={customization} onChange={event => setCustomization(event.target.value)} /></label>}
       <div className="quantity-price"><div><span className="field-label">{product.pricingType === "collection" ? "Selected quantity" : "Quantity"}</span>{product.pricingType === "collection" ? <strong className="selected-quantity">{quantity} pieces</strong> : <QuantitySelector min={product.minimumQuantity ?? 1} value={quantity} onChange={setQuantity} />}</div><div className="product-price"><span>{productPriceLabel(product, selection, quantity)}</span><small>{product.bulkOnly ? `Minimum order: ${product.minimumQuantity ?? 50} plants` : product.pricingType === "collection" ? "Custom quantities of 24+ are confirmed on WhatsApp" : "Per item"}</small></div></div>
-      {!validQuantity && <p className="form-error" role="alert">{product.bulkOnly ? `Plants have a minimum order of ${product.minimumQuantity ?? 50}.` : "Choose 6 or 12 pieces, or enter at least 24 for custom quantities."}</p>}
+      {!validQuantity && <p className="form-error" role="alert">{product.bulkOnly ? "Plants are available for bulk orders only. Minimum order quantity is 50." : collectionOption === "bulk" ? "Bulk orders start at 50 pieces." : "Custom quantities must be 24 pieces or more."}</p>}
       {product.bulkOnly && <p className="bulk-short-terms">40% security amount required to confirm bulk orders. Remaining 60% payable after delivery.</p>}
       <button className={`button primary add-button ${added ? "is-added" : ""}`} disabled={!product.available || !validQuantity} onClick={addToCart} aria-label={`${product.bulkOnly ? "Request bulk order for" : "Add"} ${product.name} to order`}><span className="desktop-add-copy">{added ? "Added to your order" : product.bulkOnly ? "Request Bulk Order" : "Add to Order"}</span><span className="mobile-add-copy">{added ? "Added" : "+"}</span>{added ? <Check size={18} /> : <Plus size={19} />}</button>
       <div className="product-footnote"><Leaf size={13} /><span>Handmade with care. Naturally a little unique.</span></div>
@@ -74,7 +74,7 @@ export function ProductCard({ product, potSize }: { product: Product; potSize?: 
   const [added, setAdded] = useState(false);
   const { add, notify } = useStore();
   const href = `/products/${product.id}${potSize ? `?potSize=${potSize}` : ""}`;
-  const validQuantity = validOrderQuantity(product, quantity);
+  const validQuantity = validOrderQuantity(product, quantity) && (product.pricingType !== "collection" || collectionOption !== "bulk" || quantity >= 50);
   function addToOrder() {
     try { add(product, selection, quantity); setAdded(true); setTimeout(() => setAdded(false), 1800); }
     catch (error) { notify(error instanceof Error ? error.message : "Unable to add this product."); }
@@ -88,7 +88,7 @@ export function ProductCard({ product, potSize }: { product: Product; potSize?: 
       {product.variants.map(variant => <VariantSelector key={variant.id} variant={{ ...variant, id: `${product.id}-card-${variant.id}` }} value={selection[variant.id]} onChange={value => setSelection(current => ({ ...current, [variant.id]: value }))} />)}
       {product.pricingType === "collection" && <CollectionQuantityPicker productId={`${product.id}-card`} value={collectionOption} quantity={quantity} onSelect={setCollectionOption} onQuantityChange={setQuantity} />}
       {product.disclaimer && <p className="product-disclaimer">{product.disclaimer}</p>}
-      {!validQuantity && <p className="form-error" role="alert">{product.bulkOnly ? "Minimum order: 50 plants." : "Choose 6, 12 or at least 24 pieces."}</p>}
+      {!validQuantity && <p className="form-error" role="alert">{product.bulkOnly ? "Plants are available for bulk orders only. Minimum order quantity is 50." : collectionOption === "bulk" ? "Bulk orders start at 50 pieces." : "Custom quantities must be 24 pieces or more."}</p>}
       {product.bulkOnly && <p className="bulk-short-terms">40% security amount required to confirm bulk orders. Remaining 60% payable after delivery.</p>}
       <button className={`button primary ${added ? "is-added" : ""}`} type="button" onClick={addToOrder} disabled={!product.available || !validQuantity}>{product.bulkOnly ? "Request Bulk Order" : added ? "Added to Order" : "Add to Order"} {added ? <Check size={14} /> : <Plus size={14} />}</button>
     </div>

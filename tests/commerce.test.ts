@@ -20,12 +20,13 @@ test("separate configurations stay separate, matching configurations merge", () 
   assert.equal(cartTotal([]), 0);
 });
 test("order includes variants, quantities, delivery, prices and encoded business destination", () => {
-  const message = orderMessage(delivery, [makeLine(product, { size: "3" }, 2)]);
+  const details = { ...delivery, address: "123 Example Street\nBangalore\nKarnataka", address2: "560001" };
+  const message = orderMessage(details, [makeLine(product, { size: "3" }, 2)]);
   assert.match(message, /Size: Medium/);
   assert.match(message, /Quantity: 2/);
   assert.match(message, /998/);
   assert.match(message, /nisha@example.com/);
-  assert.match(message, /411001/);
+  assert.match(message, /123 Example Street\nBangalore\nKarnataka\n560001/);
   assert.ok(whatsappUrl(message).startsWith("https://wa.me/919966998768?text="));
   assert.throws(() => orderMessage(delivery, []));
 });
@@ -48,8 +49,11 @@ test("plants are contact-priced and require at least 50 units", () => {
   const line = makeLine(plant, { size: "2" }, 50);
   assert.equal(line.totalPrice, null);
   assert.equal(hasContactPricing([line]), true);
-  assert.throws(() => makeLine(plant, { size: "2" }, 1), /at least 50/);
+  assert.equal(validOrderQuantity(plant, 100), true);
+  assert.throws(() => makeLine(plant, { size: "2" }, 49), /Plants are available for bulk orders only\. Minimum order quantity is 50\./);
   assert.throws(() => priceFor(plant, { size: "2" }), /priced on request/);
+  const invalidLine = { ...line, quantity: 49 };
+  assert.throws(() => orderMessage(delivery, [invalidLine]), /Plants are available for bulk orders only\. Minimum order quantity is 50\./);
 });
 test("candle and tealight quantities reject gaps below custom minimum", () => {
   const candle: Product = { ...product, id: "candle", name: "Flower Candle", productType: "candle", pricingType: "collection", minimumQuantity: 6, minimumCustomQuantity: 24, availableCollections: [6, 12], collectionPrices: { 6: 399, 12: 699, 24: 1199, 50: 2199 } };
@@ -58,6 +62,18 @@ test("candle and tealight quantities reject gaps below custom minimum", () => {
   assert.equal(makeLine(candle, { size: "2" }, 6).totalPrice, 399);
   assert.equal(makeLine(candle, { size: "2" }, 12).totalPrice, 699);
   assert.equal(makeLine(candle, { size: "2" }, 30).totalPrice, null);
+  const invalidCustom = { ...makeLine(candle, { size: "2" }, 24), quantity: 23 };
+  assert.throws(() => orderMessage(delivery, [invalidCustom]), /Custom quantities must be 24 pieces or more\./);
+  const invalidBulk = { ...makeLine(candle, { size: "2" }, 50), quantity: 49 };
+  assert.throws(() => orderMessage(delivery, [invalidBulk]), /Bulk orders start at 50 pieces\./);
+});
+test("WhatsApp order includes selected candle color and collection size", () => {
+  const candle: Product = { ...product, id: "flower-candle", name: "Flower Candle", productType: "candle", pricingType: "collection", minimumQuantity: 6, minimumCustomQuantity: 24, collectionPrices: { 6: 399 }, variants: [{ id: "color", label: "Preferred color", options: [{ value: "rose", label: "Rose preferred", adjustment: 0 }] }] };
+  const message = orderMessage(delivery, [makeLine(candle, { color: "rose" }, 6)]);
+  assert.match(message, /Preferred color: Rose preferred/);
+  assert.match(message, /Collection: 6 pieces/);
+  assert.match(message, /Quantity: 6 pieces/);
+  assert.match(message, /Order Type: Regular/);
 });
 test("guest phone normalization and WhatsApp message include order terms", () => {
   assert.equal(normalizeIndianPhone("+91 98765-43210"), "+919876543210");

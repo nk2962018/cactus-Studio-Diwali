@@ -80,7 +80,7 @@ export function collectionSizeFor(quantity: number): number | undefined {
 export function makeLine(product: Product, selection: Selection, quantity: number, customization = ""): CartLine {
   if (!product.available) throw new Error("This product is not available.");
   if (!validOrderQuantity(product, quantity)) {
-    if (product.bulkOnly) throw new Error(`Plants are available for bulk orders of at least ${product.minimumQuantity ?? 50}.`);
+    if (product.bulkOnly) throw new Error("Plants are available for bulk orders only. Minimum order quantity is 50.");
     if (product.pricingType === "collection") throw new Error("Choose 6 or 12 pieces, or enter a custom quantity of at least 24 pieces.");
     throw new Error("Quantity must be a whole number between 1 and 9,999.");
   }
@@ -116,9 +116,9 @@ export function orderMessage(details: DeliveryDetails, lines: CartLine[]): strin
   if (error) throw new Error(error);
   if (!lines.length) throw new Error("Your bag is empty.");
   for (const line of lines) {
-    const invalidBulkQuantity = line.bulkOnly && line.quantity < line.minimumQuantity;
-    const invalidCollectionQuantity = line.pricingType === "collection" && line.quantity !== 6 && line.quantity !== 12 && line.quantity < 24;
-    if (invalidBulkQuantity || invalidCollectionQuantity) throw new Error(`Please update the quantity for ${line.name}.`);
+    if (line.bulkOnly && line.quantity < line.minimumQuantity) throw new Error("Plants are available for bulk orders only. Minimum order quantity is 50.");
+    if (line.pricingType === "collection" && line.collectionSize === 50 && line.quantity < 50) throw new Error("Bulk orders start at 50 pieces.");
+    if (line.pricingType === "collection" && line.quantity !== 6 && line.quantity !== 12 && line.quantity < 24) throw new Error("Custom quantities must be 24 pieces or more.");
   }
   const bulkOrder = lines.some(line => line.bulkOnly || line.quantity >= 50);
   const orderLines = lines.flatMap((line, index) => ["", `${index + 1}. ${line.name}`, ...Object.entries(line.variantLabels).map(([label, value]) => `${label}: ${value}`), ...(line.collectionSize ? [`Collection: ${line.collectionSize} pieces`] : []), ...(line.customization ? [`Customization: ${line.customization}`] : []), `Quantity: ${line.quantity} pieces`, `Price: ${line.totalPrice === null ? "To be confirmed on WhatsApp" : money(line.totalPrice)}`]);
