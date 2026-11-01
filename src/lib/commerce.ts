@@ -1,6 +1,6 @@
 export type VariantOption = { value: string; label: string; adjustment: number };
 export type Variant = { id: string; label: string; options: VariantOption[] };
-export type Category = "Plants" | "Candles" | "Tealights" | "DIY / Trinkets" | "Idols" ;
+export type Category = "Plants" | "Candles" | "Tealights" | "DIY / Trinkets" | "Idols" | "Curated Gifts";
 export type ProductType = "plant" | "candle" | "tealight" | "diy" | "idol" | "gift";
 export type PricingType = "fixed" | "collection" | "contact";
 export type Product = {
