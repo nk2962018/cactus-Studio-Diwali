@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { addLine, cartTotal, defaults, hasContactPricing, makeLine, normalizeIndianPhone, orderMessage, priceFor, validOrderQuantity, validateDelivery, whatsappUrl, type Product } from "../src/lib/commerce";
 
-const product: Product = { id: "gift", name: "Gift Box", productType: "gift", pricingType: "fixed", description: "Thoughtful gift", detail: "", images: [], available: true, basePrice: 299, variants: [{ id: "size", label: "Size", options: [{ value: "2", label: "Small", adjustment: 0 }, { value: "3", label: "Medium", adjustment: 200 }, { value: "4", label: "Large", adjustment: 400 }] }] };
+const product: Product = { id: "gift", name: "Gift Box", category: "Curated Gifts", productType: "gift", pricingType: "fixed", description: "Thoughtful gift", detail: "", images: [], available: true, basePrice: 299, variants: [{ id: "size", label: "Size", options: [{ value: "2", label: "Small", adjustment: 0 }, { value: "3", label: "Medium", adjustment: 200 }, { value: "4", label: "Large", adjustment: 400 }] }] };
 const delivery = { name: "Nisha", phone: "9876543210", email: "nisha@example.com", address: "12 Garden Road, Pune" , landmark: "", pincode: "411001", instructions: "" };
 test("variant prices and defaults are derived from catalogue", () => {
   assert.deepEqual(defaults(product), { size: "2" });
