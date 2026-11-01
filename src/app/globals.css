@@ -824,6 +824,18 @@ html { scroll-padding-top: 90px; }
 .catalogue-card-info .variant-option { min-height: 34px; min-width: 37px; padding: 6px 8px; font-size: 9px; }
 .catalogue-card-info .collection-picker .variant-options { gap: 5px; }
 .catalogue-card-info .collection-picker .variant-option { flex: 1 1 42%; }
+.collection-picker .variant-option > span { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; text-align: left; }
+.collection-picker .variant-option strong { font-size: 11px; font-weight: 500; }
+.collection-picker .variant-option small { color: #777d6d; font-size: 9px; }
+.collection-picker .variant-option.selected small { color: inherit; opacity: .8; }
+.collection-selection-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 17px; padding: 14px 16px; background: #f0f0e7; border-radius: 4px; }
+.collection-selection-summary > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.collection-selection-summary > div:last-child { align-items: flex-end; text-align: right; }
+.collection-selection-summary span { color: #7d8273; font-size: 9px; }
+.collection-selection-summary strong { font-size: 14px; font-weight: 600; }
+.catalogue-card-info .collection-selection-summary { margin-top: 11px; padding: 9px; gap: 5px; }
+.catalogue-card-info .collection-selection-summary strong { font-size: 10px; }
+.catalogue-card-info .collection-selection-summary span { font-size: 8px; }
 .card-order-note, .card-collection-note { margin-block: 9px !important; color: #646a5c; font-size: 9px !important; line-height: 1.65; }
 .card-price { font-size: 12px !important; font-weight: 600; }
 .catalogue-card-info > .bulk-short-terms { color: #75694e; }

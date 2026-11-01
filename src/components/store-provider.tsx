@@ -56,7 +56,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setLines(current => current.flatMap(line => {
       if (line.key !== key) return [line];
       const product = getProduct(line.productId);
-      const minimum = line.bulkOnly ? line.minimumQuantity : line.pricingType === "collection" ? line.collectionSize === 50 ? 50 : line.collectionSize === 24 ? 24 : 6 : 1;
+      if (line.pricingType === "collection") {
+        const collectionSize = line.collectionSize;
+        const collectionPrice = collectionSize ? product?.collectionPrices?.[collectionSize] : undefined;
+        if (!product || !collectionSize || ![6, 12].includes(collectionSize) || quantity < collectionSize || quantity % collectionSize !== 0 || collectionPrice === undefined) return [line];
+        return [{ ...line, quantity, totalPrice: collectionPrice * (quantity / collectionSize) }];
+      }
+      const minimum = line.bulkOnly ? line.minimumQuantity : 1;
       if (!product || quantity < minimum || !validOrderQuantity(product, quantity)) return [line];
       try { return [makeLine(product, line.variants, quantity, line.customization)]; }
       catch { return [line]; }

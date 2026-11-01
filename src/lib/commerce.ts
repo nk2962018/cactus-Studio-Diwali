@@ -1,6 +1,6 @@
 export type VariantOption = { value: string; label: string; adjustment: number };
 export type Variant = { id: string; label: string; options: VariantOption[] };
-export type Category = "Plants" | "Candles" | "Tealights" | "DIY / Trinkets" | "Idols" | "Curated Gifts";
+export type Category = "Plants" | "Candles" | "Tealights" | "DIY / Trinkets" | "Idols" ;
 export type ProductType = "plant" | "candle" | "tealight" | "diy" | "idol" | "gift";
 export type PricingType = "fixed" | "collection" | "contact";
 export type Product = {
@@ -70,18 +70,17 @@ export function priceFor(product: Product, selection: Selection): number {
 export function validOrderQuantity(product: Product, quantity: number): boolean {
   if (!Number.isInteger(quantity) || quantity < 1 || quantity > 9999) return false;
   if (product.bulkOnly) return quantity >= (product.minimumQuantity ?? 50);
-  if (product.pricingType === "collection") return quantity === 6 || quantity === 12 || quantity >= (product.minimumCustomQuantity ?? 24);
+  if (product.pricingType === "collection") return product.availableCollections?.includes(quantity) ?? false;
   return true;
 }
 export function collectionSizeFor(quantity: number): number | undefined {
-  if (quantity === 6 || quantity === 12) return quantity;
-  return quantity >= 50 ? 50 : quantity >= 24 ? 24 : undefined;
+  return quantity === 6 || quantity === 12 ? quantity : undefined;
 }
 export function makeLine(product: Product, selection: Selection, quantity: number, customization = ""): CartLine {
   if (!product.available) throw new Error("This product is not available.");
   if (!validOrderQuantity(product, quantity)) {
     if (product.bulkOnly) throw new Error("Plants are available for bulk orders only. Minimum order quantity is 50.");
-    if (product.pricingType === "collection") throw new Error("Choose 6 or 12 pieces, or enter a custom quantity of at least 24 pieces.");
+    if (product.pricingType === "collection") throw new Error("Choose one of the available product collections.");
     throw new Error("Quantity must be a whole number between 1 and 9,999.");
   }
   const variants = Object.fromEntries(product.variants.map(variant => [variant.id, selection[variant.id]]));
@@ -117,11 +116,10 @@ export function orderMessage(details: DeliveryDetails, lines: CartLine[]): strin
   if (!lines.length) throw new Error("Your bag is empty.");
   for (const line of lines) {
     if (line.bulkOnly && line.quantity < line.minimumQuantity) throw new Error("Plants are available for bulk orders only. Minimum order quantity is 50.");
-    if (line.pricingType === "collection" && line.collectionSize === 50 && line.quantity < 50) throw new Error("Bulk orders start at 50 pieces.");
-    if (line.pricingType === "collection" && line.quantity !== 6 && line.quantity !== 12 && line.quantity < 24) throw new Error("Custom quantities must be 24 pieces or more.");
+    if (line.pricingType === "collection" && (!line.collectionSize || ![6, 12].includes(line.collectionSize) || line.quantity < line.collectionSize || line.quantity % line.collectionSize !== 0)) throw new Error("Choose one of the available product collections.");
   }
   const bulkOrder = lines.some(line => line.bulkOnly || line.quantity >= 50);
-  const orderLines = lines.flatMap((line, index) => ["", `${index + 1}. ${line.name}`, ...Object.entries(line.variantLabels).map(([label, value]) => `${label}: ${value}`), ...(line.collectionSize ? [`Collection: ${line.collectionSize} pieces`] : []), ...(line.customization ? [`Customization: ${line.customization}`] : []), `Quantity: ${line.quantity} pieces`, `Price: ${line.totalPrice === null ? "To be confirmed on WhatsApp" : money(line.totalPrice)}`]);
+  const orderLines = lines.flatMap((line, index) => ["", `${index + 1}. ${line.name}`, ...Object.entries(line.variantLabels).map(([label, value]) => `${label}: ${value}`), ...(line.collectionSize ? [`Collection: Set of ${line.collectionSize}`] : []), ...(line.customization ? [`Customization: ${line.customization}`] : []), `Quantity: ${line.quantity} pieces${line.pricingType === "collection" && line.collectionSize && line.quantity > line.collectionSize ? ` (${line.quantity / line.collectionSize} sets)` : ""}`, `Price: ${line.totalPrice === null ? "To be confirmed on WhatsApp" : money(line.totalPrice)}`]);
   return ["Hello Cactus Studio,", "", "I would like to place an order.", "", "Customer Details:", `Name: ${details.name.trim()}`, `Phone: ${normalizeIndianPhone(details.phone)}`, ...(details.email ? [`Email: ${details.email.trim()}`] : []), "", "Delivery Address:", details.address.trim(), ...(details.address2 ? [details.address2.trim()] : []), ...(details.landmark ? [`Landmark: ${details.landmark.trim()}`] : []), ...(details.pincode ? [`Pincode: ${details.pincode}`] : []), ...(details.instructions ? [`Special instructions: ${details.instructions.trim()}`] : []), "", "Order:", ...orderLines, "", `Order Type: ${bulkOrder ? "Bulk" : "Regular"}`, ...(cartTotal(lines) > 0 ? [`Priced items subtotal: ${money(cartTotal(lines))}`] : []), ...(hasContactPricing(lines) ? ["Bulk pricing will be shared on WhatsApp."] : []), ...(bulkOrder ? ["", "Bulk Order Payment Terms: A 40% security amount is required to confirm and process bulk orders. The remaining 60% is payable after delivery. Final pricing, delivery timelines and payment details will be confirmed with Cactus Studio before the order is processed."] : []), "", "Please confirm availability, pricing and delivery details.", "Thank you."].join("\n");
 }
 export const whatsappUrl = (message: string) => `https://wa.me/919966998768?text=${encodeURIComponent(message)}`;

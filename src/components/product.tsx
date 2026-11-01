@@ -22,27 +22,35 @@ export function ProductVisual({ product, priority = false, imageIndex = 0, onSel
     <span className="image-caption">THOUGHTFULLY MADE, JUST FOR YOU</span>
   </div>;
 }
-function CollectionQuantityPicker({ productId, value, quantity, onSelect, onQuantityChange }: { productId: string; value: "6" | "12" | "custom" | "bulk"; quantity: number; onSelect: (value: "6" | "12" | "custom" | "bulk") => void; onQuantityChange: (quantity: number) => void }) {
-  const options = [{ id: "6", label: "6 pieces" }, { id: "12", label: "12 pieces" }, { id: "custom", label: "Custom (24+)" }, { id: "bulk", label: "Bulk (50+)" }] as const;
-  return <fieldset className="variant-selector collection-picker"><legend>Collection quantity</legend><div className="variant-options">{options.map(option => <label key={option.id} className={value === option.id ? "variant-option selected" : "variant-option"}><input type="radio" name={`${productId}-collection`} value={option.id} checked={value === option.id} onChange={() => { onSelect(option.id); onQuantityChange(option.id === "6" ? 6 : option.id === "12" ? 12 : option.id === "bulk" ? 50 : 24); }} /><span>{option.label}</span></label>)}</div>{(value === "custom" || value === "bulk") && <label className="custom-quantity">{value === "custom" ? "Custom quantity (minimum 24)" : "Bulk quantity (minimum 50)"}<input type="number" min={value === "custom" ? 24 : 50} max={9999} step={1} value={quantity} onChange={event => onQuantityChange(Number(event.target.value))} /></label>}</fieldset>;
+function CollectionQuantityPicker({ product, value, onSelect, onQuantityChange }: { product: Product; value: number; onSelect: (value: number) => void; onQuantityChange: (quantity: number) => void }) {
+  const options = (product.availableCollections ?? []).map(quantity => ({ quantity, price: product.collectionPrices?.[quantity] }));
+  return <fieldset className="variant-selector collection-picker"><legend>Choose your collection</legend><div className="variant-options">{options.map(option => <label key={option.quantity} className={value === option.quantity ? "variant-option selected" : "variant-option"}><input type="radio" name={`${product.id}-collection`} value={option.quantity} checked={value === option.quantity} onChange={() => { onSelect(option.quantity); onQuantityChange(option.quantity); }} /><span><strong>Set of {option.quantity}</strong><small>{option.quantity} pieces{option.price === undefined ? "" : ` · ${money(option.price)}`}</small></span></label>)}</div></fieldset>;
 }
 function productPriceLabel(product: Product, selection: Selection, quantity: number) {
   if (product.pricingType === "contact") return "Bulk pricing will be shared on WhatsApp";
   if (product.pricingType === "collection") {
     const price = product.collectionPrices?.[quantity];
-    return price === undefined ? "Price confirmed on WhatsApp" : `${money(price)} collection price`;
+    return price === undefined ? "Price confirmed on WhatsApp" : money(price);
   }
   return money(priceFor(product, selection));
 }
+function CollectionSelectionSummary({ product, quantity }: { product: Product; quantity: number }) {
+  return <div className="collection-selection-summary"><div><span>Your selection</span><strong>Set of {quantity} · {quantity} pieces</strong></div><div><span>Total</span><strong>{productPriceLabel(product, {}, quantity)}</strong></div></div>;
+}
+function bulkOrderUrl(product: Product, selection: Selection, quantity: number) {
+  const params = new URLSearchParams({ productId: product.id, quantity: String(quantity) });
+  if (selection.potSize) params.set("potSize", selection.potSize);
+  return `/bulk-orders?${params.toString()}`;
+}
 export function ProductDetail({ product, full = false, number = 1, potSize }: { product: Product; full?: boolean; number?: number; potSize?: string }) {
   const [selection, setSelection] = useState<Selection>(() => ({ ...defaults(product), ...(product.variants.some(variant => variant.id === "potSize" && variant.options.some(option => option.value === potSize)) ? { potSize: potSize! } : {}) }));
-  const [collectionOption, setCollectionOption] = useState<"6" | "12" | "custom" | "bulk">("6");
-  const [quantity, setQuantity] = useState(product.bulkOnly ? product.minimumQuantity ?? 50 : product.pricingType === "collection" ? 6 : 1);
+  const [collectionOption, setCollectionOption] = useState(product.availableCollections?.[0] ?? 6);
+  const [quantity, setQuantity] = useState(product.bulkOnly ? product.minimumQuantity ?? 50 : product.pricingType === "collection" ? product.availableCollections?.[0] ?? 6 : 1);
   const [imageIndex, setImageIndex] = useState(0);
   const [customization, setCustomization] = useState("");
   const [added, setAdded] = useState(false);
   const { add, notify } = useStore();
-  const validQuantity = validOrderQuantity(product, quantity) && (product.pricingType !== "collection" || collectionOption !== "bulk" || quantity >= 50);
+  const validQuantity = validOrderQuantity(product, quantity);
   function addToCart() {
     try { add(product, selection, quantity, customization); setAdded(true); setTimeout(() => setAdded(false), 2000); }
     catch (error) { notify(error instanceof Error ? error.message : "Unable to add this product."); }
@@ -55,12 +63,12 @@ export function ProductDetail({ product, full = false, number = 1, potSize }: { 
       <p className="product-detail-copy">{product.detail}</p>
       {full && <ul className="product-benefits"><li><Leaf size={15} />{product.bulkOnly ? "Plants available exclusively for bulk orders" : "Made by hand"}</li><li><ShieldCheck size={15} /> Carefully packed</li><li><Gift size={15} /> Perfect for gifting</li></ul>}
       {product.disclaimer && <p className="product-disclaimer">{product.disclaimer}</p>}
-      <div className="product-variants">{product.variants.map(variant => <VariantSelector key={variant.id} variant={{ ...variant, id: `${product.id}-${variant.id}` }} value={selection[variant.id]} onChange={value => setSelection(current => ({ ...current, [variant.id]: value }))} />)}{product.pricingType === "collection" && <CollectionQuantityPicker productId={product.id} value={collectionOption} quantity={quantity} onSelect={setCollectionOption} onQuantityChange={setQuantity} />}</div>
+      <div className="product-variants">{product.variants.map(variant => <VariantSelector key={variant.id} variant={{ ...variant, id: `${product.id}-${variant.id}` }} value={selection[variant.id]} onChange={value => setSelection(current => ({ ...current, [variant.id]: value }))} />)}{product.pricingType === "collection" && <CollectionQuantityPicker product={product} value={collectionOption} onSelect={setCollectionOption} onQuantityChange={setQuantity} />}</div>
       {product.customizable && <label className="custom-note">Make it personal <span>(optional)</span><textarea rows={2} maxLength={300} placeholder="A gift note or a little customization..." value={customization} onChange={event => setCustomization(event.target.value)} /></label>}
-      <div className="quantity-price"><div><span className="field-label">{product.pricingType === "collection" ? "Selected quantity" : "Quantity"}</span>{product.pricingType === "collection" ? <strong className="selected-quantity">{quantity} pieces</strong> : <QuantitySelector min={product.minimumQuantity ?? 1} value={quantity} onChange={setQuantity} />}</div><div className="product-price"><span>{productPriceLabel(product, selection, quantity)}</span><small>{product.bulkOnly ? `Minimum order: ${product.minimumQuantity ?? 50} plants` : product.pricingType === "collection" ? "Custom quantities of 24+ are confirmed on WhatsApp" : "Per item"}</small></div></div>
-      {!validQuantity && <p className="form-error" role="alert">{product.bulkOnly ? "Plants are available for bulk orders only. Minimum order quantity is 50." : collectionOption === "bulk" ? "Bulk orders start at 50 pieces." : "Custom quantities must be 24 pieces or more."}</p>}
+      {product.pricingType === "collection" ? <CollectionSelectionSummary product={product} quantity={quantity} /> : <div className="quantity-price"><div><span className="field-label">Quantity</span><QuantitySelector min={product.minimumQuantity ?? 1} value={quantity} onChange={setQuantity} /></div><div className="product-price"><span>{productPriceLabel(product, selection, quantity)}</span><small>Per item</small></div></div>}
+      {!validQuantity && <p className="form-error" role="alert">{product.bulkOnly ? "Plants are available for bulk orders only. Minimum order quantity is 50." : "Choose one of the available product collections."}</p>}
       {product.bulkOnly && <p className="bulk-short-terms">40% security amount required to confirm bulk orders. Remaining 60% payable after delivery.</p>}
-      <button className={`button primary add-button ${added ? "is-added" : ""}`} disabled={!product.available || !validQuantity} onClick={addToCart} aria-label={`${product.bulkOnly ? "Request bulk order for" : "Add"} ${product.name} to order`}><span className="desktop-add-copy">{added ? "Added to your order" : product.bulkOnly ? "Request Bulk Order" : "Add to Order"}</span><span className="mobile-add-copy">{added ? "Added" : "+"}</span>{added ? <Check size={18} /> : <Plus size={19} />}</button>
+      {product.bulkOnly ? <Link className="button primary add-button" href={bulkOrderUrl(product, selection, quantity)} aria-label={`Request bulk order for ${product.name}`}><span className="desktop-add-copy">Request Bulk Order</span><span className="mobile-add-copy">Request Bulk Order</span><ArrowUpRight size={18} /></Link> : <button className={`button primary add-button ${added ? "is-added" : ""}`} disabled={!product.available || !validQuantity} onClick={addToCart} aria-label={product.pricingType === "collection" ? `Add set of ${quantity} to order` : `Add ${product.name} to order`}><span className="desktop-add-copy">{added ? "Added to your order" : product.pricingType === "collection" ? `Add Set of ${quantity} to Order` : "Add to Order"}</span><span className="mobile-add-copy">{added ? "Added" : product.pricingType === "collection" ? `Add Set of ${quantity} to Order` : "+"}</span>{added ? <Check size={18} /> : <Plus size={19} />}</button>}
       <div className="product-footnote"><Leaf size={13} /><span>Handmade with care. Naturally a little unique.</span></div>
     </div>
     <ProductVisual product={product} priority={full} imageIndex={imageIndex} onSelectImage={full ? setImageIndex : undefined} />
@@ -69,12 +77,12 @@ export function ProductDetail({ product, full = false, number = 1, potSize }: { 
 export function ProductCard({ product, potSize }: { product: Product; potSize?: string; number?: number }) {
   const selectionDefaults = { ...defaults(product), ...(potSize && product.variants.some(variant => variant.id === "potSize") ? { potSize } : {}) };
   const [selection, setSelection] = useState<Selection>(selectionDefaults);
-  const [collectionOption, setCollectionOption] = useState<"6" | "12" | "custom" | "bulk">("6");
-  const [quantity, setQuantity] = useState(product.bulkOnly ? product.minimumQuantity ?? 50 : product.pricingType === "collection" ? 6 : 1);
+  const [collectionOption, setCollectionOption] = useState(product.availableCollections?.[0] ?? 6);
+  const [quantity, setQuantity] = useState(product.bulkOnly ? product.minimumQuantity ?? 50 : product.pricingType === "collection" ? product.availableCollections?.[0] ?? 6 : 1);
   const [added, setAdded] = useState(false);
   const { add, notify } = useStore();
   const href = `/products/${product.id}${potSize ? `?potSize=${potSize}` : ""}`;
-  const validQuantity = validOrderQuantity(product, quantity) && (product.pricingType !== "collection" || collectionOption !== "bulk" || quantity >= 50);
+  const validQuantity = validOrderQuantity(product, quantity);
   function addToOrder() {
     try { add(product, selection, quantity); setAdded(true); setTimeout(() => setAdded(false), 1800); }
     catch (error) { notify(error instanceof Error ? error.message : "Unable to add this product."); }
@@ -83,14 +91,14 @@ export function ProductCard({ product, potSize }: { product: Product; potSize?: 
     <Link href={href} className="catalogue-card-image" aria-label={`View ${product.name}`}><ProductVisual product={product} /></Link>
     <div className="catalogue-card-info"><h3><Link href={href}>{product.name}</Link></h3><p>{product.description}</p>
       {product.bulkOnly && <p className="card-order-note">Available sizes: {product.availableSizes?.join(", ")}<br /><strong>Plants are available exclusively for bulk orders.</strong><br />Minimum order: {product.minimumQuantity ?? 50} plants</p>}
-      {product.pricingType === "collection" && <p className="card-collection-note">Collections of 6 or 12; custom quantities 24+; bulk 50+.<br />{productPriceLabel(product, selection, quantity)}</p>}
       {!product.bulkOnly && product.pricingType === "fixed" && <p className="card-price">{productPriceLabel(product, selection, quantity)}</p>}
       {product.variants.map(variant => <VariantSelector key={variant.id} variant={{ ...variant, id: `${product.id}-card-${variant.id}` }} value={selection[variant.id]} onChange={value => setSelection(current => ({ ...current, [variant.id]: value }))} />)}
-      {product.pricingType === "collection" && <CollectionQuantityPicker productId={`${product.id}-card`} value={collectionOption} quantity={quantity} onSelect={setCollectionOption} onQuantityChange={setQuantity} />}
+      {product.pricingType === "collection" && <CollectionQuantityPicker product={product} value={collectionOption} onSelect={setCollectionOption} onQuantityChange={setQuantity} />}
+      {product.pricingType === "collection" && <CollectionSelectionSummary product={product} quantity={quantity} />}
       {product.disclaimer && <p className="product-disclaimer">{product.disclaimer}</p>}
-      {!validQuantity && <p className="form-error" role="alert">{product.bulkOnly ? "Plants are available for bulk orders only. Minimum order quantity is 50." : collectionOption === "bulk" ? "Bulk orders start at 50 pieces." : "Custom quantities must be 24 pieces or more."}</p>}
+      {!validQuantity && <p className="form-error" role="alert">{product.bulkOnly ? "Plants are available for bulk orders only. Minimum order quantity is 50." : "Choose one of the available product collections."}</p>}
       {product.bulkOnly && <p className="bulk-short-terms">40% security amount required to confirm bulk orders. Remaining 60% payable after delivery.</p>}
-      <button className={`button primary ${added ? "is-added" : ""}`} type="button" onClick={addToOrder} disabled={!product.available || !validQuantity}>{product.bulkOnly ? "Request Bulk Order" : added ? "Added to Order" : "Add to Order"} {added ? <Check size={14} /> : <Plus size={14} />}</button>
+      {product.bulkOnly ? <Link className="button primary" href={bulkOrderUrl(product, selection, quantity)}>Request Bulk Order <ArrowUpRight size={14} /></Link> : <button className={`button primary ${added ? "is-added" : ""}`} type="button" onClick={addToOrder} disabled={!product.available || !validQuantity}>{added ? "Added to Order" : product.pricingType === "collection" ? `Add Set of ${quantity} to Order` : "Add to Order"} {added ? <Check size={14} /> : <Plus size={14} />}</button>}
     </div>
   </article>;
 }

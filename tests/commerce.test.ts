@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { addLine, cartTotal, defaults, hasContactPricing, makeLine, normalizeIndianPhone, orderMessage, priceFor, validOrderQuantity, validateDelivery, whatsappUrl, type Product } from "../src/lib/commerce";
 
-const product: Product = { id: "gift", name: "Gift Box", category: "Curated Gifts", productType: "gift", pricingType: "fixed", description: "Thoughtful gift", detail: "", images: [], available: true, basePrice: 299, variants: [{ id: "size", label: "Size", options: [{ value: "2", label: "Small", adjustment: 0 }, { value: "3", label: "Medium", adjustment: 200 }, { value: "4", label: "Large", adjustment: 400 }] }] };
+const product: Product = { id: "gift", name: "Gift Box", productType: "gift", pricingType: "fixed", description: "Thoughtful gift", detail: "", images: [], available: true, basePrice: 299, variants: [{ id: "size", label: "Size", options: [{ value: "2", label: "Small", adjustment: 0 }, { value: "3", label: "Medium", adjustment: 200 }, { value: "4", label: "Large", adjustment: 400 }] }] };
 const delivery = { name: "Nisha", phone: "9876543210", email: "nisha@example.com", address: "12 Garden Road, Pune" , landmark: "", pincode: "411001", instructions: "" };
 test("variant prices and defaults are derived from catalogue", () => {
   assert.deepEqual(defaults(product), { size: "2" });
@@ -55,23 +55,31 @@ test("plants are contact-priced and require at least 50 units", () => {
   const invalidLine = { ...line, quantity: 49 };
   assert.throws(() => orderMessage(delivery, [invalidLine]), /Plants are available for bulk orders only\. Minimum order quantity is 50\./);
 });
-test("candle and tealight quantities reject gaps below custom minimum", () => {
-  const candle: Product = { ...product, id: "candle", name: "Flower Candle", productType: "candle", pricingType: "collection", minimumQuantity: 6, minimumCustomQuantity: 24, availableCollections: [6, 12], collectionPrices: { 6: 399, 12: 699, 24: 1199, 50: 2199 } };
-  for (const quantity of [6, 12, 24, 30, 49, 50]) assert.equal(validOrderQuantity(candle, quantity), true);
-  for (const quantity of [1, 5, 7, 18, 23]) assert.equal(validOrderQuantity(candle, quantity), false);
-  assert.equal(makeLine(candle, { size: "2" }, 6).totalPrice, 399);
-  assert.equal(makeLine(candle, { size: "2" }, 12).totalPrice, 699);
-  assert.equal(makeLine(candle, { size: "2" }, 30).totalPrice, null);
-  const invalidCustom = { ...makeLine(candle, { size: "2" }, 24), quantity: 23 };
-  assert.throws(() => orderMessage(delivery, [invalidCustom]), /Custom quantities must be 24 pieces or more\./);
-  const invalidBulk = { ...makeLine(candle, { size: "2" }, 50), quantity: 49 };
-  assert.throws(() => orderMessage(delivery, [invalidBulk]), /Bulk orders start at 50 pieces\./);
+test("candles and tealights accept only their configured 6 and 12 piece sets", () => {
+  const candle: Product = { ...product, id: "candle", name: "Flower Candle", productType: "candle", pricingType: "collection", minimumQuantity: 6, availableCollections: [6, 12], collectionPrices: { 6: 399, 12: 699 } };
+  for (const quantity of [6, 12]) assert.equal(validOrderQuantity(candle, quantity), true);
+  for (const quantity of [1, 5, 7, 18, 23, 24, 30, 49, 50]) assert.equal(validOrderQuantity(candle, quantity), false);
+  const setOfSix = makeLine(candle, { size: "2" }, 6);
+  const setOfTwelve = makeLine(candle, { size: "2" }, 12);
+  assert.equal(setOfSix.totalPrice, 399);
+  assert.equal(setOfTwelve.totalPrice, 699);
+  assert.equal(cartTotal([setOfSix, setOfTwelve]), 1098);
+  const repeatedSet = addLine([setOfSix], setOfSix)[0];
+  assert.equal(repeatedSet.collectionSize, 6);
+  assert.equal(repeatedSet.quantity, 12);
+  assert.equal(repeatedSet.totalPrice, 798);
+  assert.equal(cartTotal([repeatedSet]), 798);
+  assert.match(orderMessage(delivery, [repeatedSet]), /Quantity: 12 pieces \(2 sets\)/);
+  assert.throws(() => makeLine(candle, { size: "2" }, 24), /available product collections/);
+  assert.throws(() => orderMessage(delivery, [{ ...setOfSix, quantity: 23 }]), /available product collections/);
+  assert.match(orderMessage(delivery, [setOfSix]), /Collection: Set of 6/);
+  assert.match(orderMessage(delivery, [setOfTwelve]), /Collection: Set of 12/);
 });
 test("WhatsApp order includes selected candle color and collection size", () => {
-  const candle: Product = { ...product, id: "flower-candle", name: "Flower Candle", productType: "candle", pricingType: "collection", minimumQuantity: 6, minimumCustomQuantity: 24, collectionPrices: { 6: 399 }, variants: [{ id: "color", label: "Preferred color", options: [{ value: "rose", label: "Rose preferred", adjustment: 0 }] }] };
+  const candle: Product = { ...product, id: "flower-candle", name: "Flower Candle", productType: "candle", pricingType: "collection", minimumQuantity: 6, availableCollections: [6, 12], collectionPrices: { 6: 399 }, variants: [{ id: "color", label: "Preferred color", options: [{ value: "rose", label: "Rose preferred", adjustment: 0 }] }] };
   const message = orderMessage(delivery, [makeLine(candle, { color: "rose" }, 6)]);
   assert.match(message, /Preferred color: Rose preferred/);
-  assert.match(message, /Collection: 6 pieces/);
+  assert.match(message, /Collection: Set of 6/);
   assert.match(message, /Quantity: 6 pieces/);
   assert.match(message, /Order Type: Regular/);
 });
